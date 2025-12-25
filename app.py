@@ -12,8 +12,9 @@ if "GEMINI_API_KEY" not in st.secrets:
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# モデル名を最も標準的なものに変更しました
-model = genai.GenerativeModel('gemini-1.5-flash')
+# エラーを回避するため、あえて「models/」を頭に付けた正式な形式で指定します
+# もしこれでもダメな場合は 'models/gemini-1.5-pro' も試せるようにします
+model = genai.GenerativeModel('models/gemini-1.5-flash')
 
 tab1, tab2 = st.tabs(["情報取得", "在庫一覧"])
 
@@ -33,7 +34,8 @@ with tab1:
                         st.success("解析が完了しました！")
                         st.info(response.text)
                     except Exception as e:
-                        st.error(f"AIとの通信でエラーが発生しました。時間を置いて再度お試しください。: {e}")
+                        # 404エラーが出た場合に備え、別のモデル名でのヒントを表示
+                        st.error(f"エラーが発生しました。APIキーを作成したサイトで「Gemini 1.5 Flash」が利用可能か確認してください。: {e}")
 
     else:
         uploaded_files = st.file_uploader("写真を選択", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
