@@ -25,13 +25,25 @@ genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 def get_spreadsheet():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds_info = json.loads(st.secrets["SERVICE_ACCOUNT_JSON"])
-    # 接続テスト用（保存時に鍵が必要な場合は別途修正します）
     creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
     client = gspread.authorize(creds)
     return client.open_by_url(SPREADSHEET_URL).sheet1
 
-# 3. モデル選択
-model = genai.GenerativeModel('gemini-1.5-flash')
+# 3. 【修正】動くモデルを自動で探す関数
+def get_working_model():
+    try:
+        # 使えるモデルのリストを取得
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        # 優先順位をつけて探す
+        for target in ["models/gemini-1.5-flash", "models/gemini-1.5-flash-latest", "models/gemini-pro"]:
+            if target in available_models:
+                return genai.GenerativeModel(target)
+        # どれも見つからない場合はリストの最初を使う
+        return genai.GenerativeModel(available_models[0])
+    except:
+        return genai.GenerativeModel("models/gemini-1.5-flash")
+
+model = get_working_model()
 
 tab1, tab2 = st.tabs(["情報取得", "在庫一覧"])
 
@@ -45,7 +57,7 @@ with tab1:
             with st.spinner("解析中..."):
                 try:
                     prompt = """
-                    以下の情報を抽出し、必ずJSON形式のみで出力してください。余計な解説は不要です。
+                    以下の情報を抽出し、必ずJSON形式のみで出力してください。
                     {"name": "生地名", "material": "素材", "width": "幅", "length": 100, "total_price": 2000, "price_per_m": 2000, "shop": "店名"}
                     
                     ※数量と単位(50cm等)から合計長(cm)を出し、単価と数量から合計価格を出し、1mあたりの価格も計算してください。
@@ -57,45 +69,31 @@ with tab1:
                         img = Image.open(uploaded_file)
                         response = model.generate_content([prompt, img])
                     
-                    # --- エラー回避の処理 ---
                     if response and response.text:
-                        # 記号などを取り除いてJSON部分だけを抜き出す
                         json_str = re.search(r'\{.*\}', response.text, re.DOTALL)
                         if json_str:
                             st.session_state.data = json.loads(json_str.group())
                             st.success("解析完了！")
                             st.write(st.session_state.data)
                         else:
-                            st.error("AIの回答からデータが見つかりませんでした。もう一度お試しください。")
-                            st.write("AIの回答:", response.text)
+                            st.error("データの抽出に失敗しました。")
                     
                 except Exception as e:
                     st.error(f"解析エラーが発生しました: {e}")
         else:
             st.warning("内容を入力するか、写真をアップロードしてください。")
 
-    # 保存ボタン
     if "data" in st.session_state:
         if st.button("スプレッドシートに保存"):
             try:
                 sheet = get_spreadsheet()
                 d = st.session_state.data
-                row = [
-                    str(datetime.date.today()), 
-                    d.get("name", ""), 
-                    d.get("material", ""), 
-                    d.get("width", ""), 
-                    d.get("length", 0), 
-                    d.get("total_price", 0), 
-                    d.get("price_per_m", 0), 
-                    d.get("shop", "")
-                ]
+                row = [str(datetime.date.today()), d.get("name",""), d.get("material",""), d.get("width",""), d.get("length",0), d.get("total_price",0), d.get("price_per_m",0), d.get("shop","")]
                 sheet.append_row(row)
-                st.success("スプレッドシートに保存しました！")
+                st.success("保存完了！")
                 st.balloons()
             except Exception as e:
                 st.error(f"保存エラー: {e}")
-                st.info("※サービスアカウントの権限設定や、Secretsの鍵情報が不足している可能性があります。")
 
 with tab2:
     st.write(f"[スプレッドシートを開く]({SPREADSHEET_URL})")
