@@ -9,10 +9,9 @@ import re
 import pandas as pd
 
 st.set_page_config(page_title="洋裁在庫ログ", layout="centered")
-st.title("🧵 魔法の洋裁ログ (複数解析版)")
+st.title("🧵 魔法の洋裁ログ (まとめ解析版)")
 
 # --- 設定 ---
-# ご自身のスプレッドシートのURLを貼り付けてください
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/あなたのシートID/edit"
 
 if "GEMINI_API_KEY" not in st.secrets or "SERVICE_ACCOUNT_JSON" not in st.secrets:
@@ -50,64 +49,63 @@ with tab1:
         text_input = st.text_area("商品説明などのテキスト")
         uploaded_files = None
     else:
-        # ★複数選択(accept_multiple_files=True)を有効化
-        uploaded_files = st.file_uploader("写真を1枚以上選んでください", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+        uploaded_files = st.file_uploader("写真をアップロード（同じ生地の複数枚もOK）", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
         text_input = None
 
     if st.button("AI解析をスタート"):
-        results = []
-        inputs = []
-        
-        # 入力データの整理
-        if method == "テキスト貼り付け" and text_input:
-            inputs = [("text", text_input)]
-        elif method == "画像アップロード" and uploaded_files:
-            inputs = [("image", f) for f in uploaded_files]
-        
-        if not inputs:
-            st.warning("内容を入力するか、写真をアップロードしてください。")
-        else:
-            with st.spinner(f"{len(inputs)}件のデータを解析中..."):
-                prompt = """
-                以下の情報を抽出し、必ずJSON形式のみで出力してください。
-                {"name": "生地名", "material": "素材", "width": "幅", "length": 100, "total_price": 2000, "price_per_m": 2000, "shop": "店名"}
-                ※数値は半角数字のみ、解説不要。
-                """
-                for type, content in inputs:
-                    try:
-                        if type == "text":
-                            response = model.generate_content(prompt + "\n対象:" + content)
-                        else:
-                            img = Image.open(content)
-                            response = model.generate_content([prompt, img])
+        if (method == "テキスト貼り付け" and text_input) or (method == "画像アップロード" and uploaded_files):
+            with st.spinner("解析中..."):
+                try:
+                    # ★AIへの命令を「1つの生地としてまとめる」ように強化
+                    prompt = """
+                    提供されたすべての情報（テキストまたは複数の画像）を確認し、
+                    それらが『1つの同じ生地』に関するものであるとして、情報を統合して1つのJSON形式で出力してください。
+                    
+                    出力項目:
+                    {"name": "生地名", "material": "素材", "width": "幅", "length": 100, "total_price": 2000, "price_per_m": 2000, "shop": "店名"}
+                    
+                    ※数値は半角数字のみ。解説は一切不要です。
+                    """
+                    
+                    if method == "テキスト貼り付け":
+                        response = model.generate_content(prompt + "\n対象テキスト:" + text_input)
+                    else:
+                        # ★すべての画像を1つのリストにしてAIに一気に送る
+                        img_list = [Image.open(f) for f in uploaded_files]
+                        response = model.generate_content([prompt] + img_list)
+                    
+                    json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+                    if json_match:
+                        result_data = json.loads(json_match.group())
+                        st.session_state.single_result = result_data # 1つの結果として保存
+                        st.success("解析完了！情報を1つにまとめました。")
                         
-                        json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-                        if json_match:
-                            results.append(json.loads(json_match.group()))
-                    except Exception as e:
-                        st.error(f"解析失敗: {e}")
-
-            if results:
-                st.success(f"{len(results)}件の解析が完了しました！")
-                # ★「コード」ではなく「表」として表示
-                df = pd.DataFrame(results)
-                df.columns = ["生地名", "素材", "幅", "長さ(cm)", "合計価格", "1m単価", "店名"]
-                st.table(df) # 綺麗な表で表示
-                st.session_state.results = results
+                        # 見やすい表で表示
+                        df = pd.DataFrame([result_data])
+                        df.columns = ["生地名", "素材", "幅", "長さ(cm)", "合計価格", "1m単価", "店名"]
+                        st.table(df)
+                    else:
+                        st.error("データの抽出に失敗しました。")
+                except Exception as e:
+                    st.error(f"解析失敗: {e}")
+        else:
+            st.warning("内容を入力するか、写真をアップロードしてください。")
 
     # 保存機能
-    if "results" in st.session_state:
-        if st.button("全てスプレッドシートに保存"):
+    if "single_result" in st.session_state:
+        if st.button("スプレッドシートに保存"):
             try:
                 sheet = get_spreadsheet()
-                today = str(datetime.date.today())
-                for d in st.session_state.results:
-                    row = [today, d.get("name",""), d.get("material",""), d.get("width",""), 
-                           d.get("length",0), d.get("total_price",0), d.get("price_per_m",0), d.get("shop","")]
-                    sheet.append_row(row)
-                st.success("全て保存しました！")
+                d = st.session_state.single_result
+                row = [
+                    str(datetime.date.today()), 
+                    d.get("name",""), d.get("material",""), d.get("width",""), 
+                    d.get("length",0), d.get("total_price",0), d.get("price_per_m",0), d.get("shop","")
+                ]
+                sheet.append_row(row)
+                st.success("スプレッドシートに保存しました！")
                 st.balloons()
-                del st.session_state.results # 重複保存防止
+                del st.session_state.single_result
             except Exception as e:
                 st.error(f"保存エラー: {e}")
 
