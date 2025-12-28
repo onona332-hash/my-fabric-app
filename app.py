@@ -11,7 +11,7 @@ st.title("🧵 魔法の洋裁ログ (GAS連携版)")
 
 # --- 設定 ---
 # 先ほどApps ScriptでコピーしたURLをここに貼り付けてください
-GAS_URL = "AKfycbytYJFd4jfex8gob7F9GxFhRXvCHdVOdVXovcP4YhuFDxmoaj7Irup6C7VoSJRycd6h"
+GAS_URL = "https:// AKfycbytYJFd4jfex8gob7F9GxFhRXvCHdVOdVXovcP4YhuFDxmoaj7Irup6C7VoSJRycd6h"
 
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("Secretsに GEMINI_API_KEY が設定されていません。")
