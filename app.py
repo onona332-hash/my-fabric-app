@@ -4,26 +4,20 @@ from PIL import Image
 import datetime
 import json
 import re
-import pandas as pd
-# 追加のライブラリ（これなら秘密鍵なしでいけます）
 import requests
 
 st.set_page_config(page_title="洋裁在庫ログ", layout="centered")
-st.title("🧵 魔法の洋裁ログ (簡易保存版)")
+st.title("🧵 魔法の洋裁ログ (GAS連携版)")
 
 # --- 設定 ---
-# ※スプレッドシートのURLをここに貼り付けてください
-# ※「リンクを知っている全員が編集者」になっている必要があります
-SPREADSHEET_URL = "あなたのスプレッドシートURL"
+# 先ほどApps ScriptでコピーしたURLをここに貼り付けてください
+GAS_URL = "AKfycbytYJFd4jfex8gob7F9GxFhRXvCHdVOdVXovcP4YhuFDxmoaj7Irup6C7VoSJRycd6h"
 
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("Secretsに GEMINI_API_KEY が設定されていません。")
     st.stop()
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-
-# スプレッドシートへ保存する関数 (Google Apps Script等を使わない最もシンプルな方法に後ほど誘導します)
-# まずは解析が動くことを最優先にします
 
 def get_working_model():
     try:
@@ -58,11 +52,16 @@ with tab1:
                     if json_match:
                         st.session_state.temp_data = json.loads(json_match.group())
                         st.success("解析完了！")
+                    else:
+                        st.error("解析結果からデータが見つかりませんでした。")
                 except Exception as e:
                     st.error(f"解析失敗: {e}")
 
     if "temp_data" in st.session_state:
+        st.divider()
+        st.subheader("📝 データの確認・修正")
         d = st.session_state.temp_data
+        
         col1, col2 = st.columns(2)
         with col1:
             name = st.text_input("生地名", value=str(d.get("name", "")))
@@ -71,10 +70,40 @@ with tab1:
             shop = st.text_input("購入店", value=str(d.get("shop", "")))
         with col2:
             width = st.text_input("幅", value=str(d.get("width", "")))
-            length_m = st.number_input("数量(m)", value=float(d.get("length", 1.0)), step=0.1)
-            total_price = st.number_input("合計価格", value=int(d.get("total_price", 0)), step=10)
+            # 数値の安全な変換
+            try: l_val = float(d.get("length", 1.0))
+            except: l_val = 1.0
+            try: p_val = int(d.get("total_price", 0))
+            except: p_val = 0
+            
+            length_m = st.number_input("数量(m)", value=l_val, step=0.1)
+            total_price = st.number_input("合計価格", value=p_val, step=10)
             price_per_m = int(total_price / length_m) if length_m > 0 else 0
             st.metric("1m単価", f"{price_per_m}円")
 
-        st.warning("現在、解析機能のみ動作しています。スプレッドシートへの保存には追加設定が必要です。")
-        # 一旦、保存ボタンは無効化するか、別の方法を案内します
+        if st.button("スプレッドシートに保存"):
+            try:
+                payload = {
+                    "date": str(datetime.date.today()),
+                    "name": name,
+                    "material": material,
+                    "color": color,
+                    "width": width,
+                    "length": length_m,
+                    "price": total_price,
+                    "unit_price": price_per_m,
+                    "shop": shop
+                }
+                # GASのウェブアプリにデータを送信
+                response = requests.post(GAS_URL, data=json.dumps(payload))
+                if response.status_code == 200:
+                    st.success("保存成功！スプレッドシートを確認してください。")
+                    st.balloons()
+                    del st.session_state.temp_data
+                else:
+                    st.error(f"保存に失敗しました。ステータスコード: {response.status_code}")
+            except Exception as e:
+                st.error(f"エラーが発生しました: {e}")
+
+with tab2:
+    st.write("スプレッドシートを開いて在庫を確認してください。")
