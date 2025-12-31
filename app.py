@@ -81,7 +81,7 @@ with tab1:
             price_per_m = int(total_price / length_m) if length_m > 0 else 0
             st.metric("1m単価", f"{price_per_m}円")
 
-        if st.button("スプレッドシートに保存"):
+         if st.button("スプレッドシートに保存"):
             try:
                 payload = {
                     "date": str(datetime.date.today()),
@@ -96,16 +96,14 @@ with tab1:
                 }
                 # GASのウェブアプリにデータを送信
                 response = requests.post(GAS_URL, data=json.dumps(payload))
+                
                 if response.status_code == 200:
                     st.success("保存成功！スプレッドシートを確認してください。")
                     st.balloons()
-                    del st.session_state.temp_data
+                    if "temp_data" in st.session_state:
+                        del st.session_state.temp_data
                 else:
-                    st.error(f"保存に失敗しました。ステータスコード: {response.status_code}")
+                    st.error(f"保存失敗 (ステータスコード: {response.status_code})")
+                    st.write("Googleからのメッセージ:", response.text)
             except Exception as e:
                 st.error(f"エラーが発生しました: {e}")
-                    st.error(f"保存失敗 (403): Google側のアクセス許可が正しく認識されていません。")
-                    st.write("レスポンス内容:", response.text) # これを追加
-
-with tab2:
-    st.write("スプレッドシートを開いて在庫を確認してください。")
