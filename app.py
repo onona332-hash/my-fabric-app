@@ -10,7 +10,7 @@ st.set_page_config(page_title="洋裁在庫ログ", layout="centered")
 st.title("🧵 魔法の洋裁ログ (GAS連携版)")
 
 # --- 設定 ---
-GAS_URL = "https://script.google.com/macros/s/AKfycbytYJFd4jfex8gob7F9GxFhRXvCHdVOdVXovcP4YhuFDxmoaj7Irup6C7VoSJRycd6h/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycbzPFuOZXKhFJeF4AlU1shojENNW5wBdJsNBMe3Gkq4IcRfQHNe9vuJGzC-uPzxudaeL/exec"
 
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("Secretsに GEMINI_API_KEY が設定されていません。")
