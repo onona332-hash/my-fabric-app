@@ -104,6 +104,8 @@ with tab1:
                     st.error(f"保存に失敗しました。ステータスコード: {response.status_code}")
             except Exception as e:
                 st.error(f"エラーが発生しました: {e}")
+                    st.error(f"保存失敗 (403): Google側のアクセス許可が正しく認識されていません。")
+                    st.write("レスポンス内容:", response.text) # これを追加
 
 with tab2:
     st.write("スプレッドシートを開いて在庫を確認してください。")
