@@ -10,7 +10,6 @@ st.set_page_config(page_title="洋裁在庫ログ", layout="centered")
 st.title("🧵 魔法の洋裁ログ (GAS連携版)")
 
 # --- 設定 ---
-# 先ほどApps ScriptでコピーしたURLをここに貼り付けてください
 GAS_URL = "https://script.google.com/macros/s/AKfycbytYJFd4jfex8gob7F9GxFhRXvCHdVOdVXovcP4YhuFDxmoaj7Irup6C7VoSJRycd6h/exec"
 
 if "GEMINI_API_KEY" not in st.secrets:
@@ -70,7 +69,6 @@ with tab1:
             shop = st.text_input("購入店", value=str(d.get("shop", "")))
         with col2:
             width = st.text_input("幅", value=str(d.get("width", "")))
-            # 数値の安全な変換
             try: l_val = float(d.get("length", 1.0))
             except: l_val = 1.0
             try: p_val = int(d.get("total_price", 0))
@@ -81,7 +79,7 @@ with tab1:
             price_per_m = int(total_price / length_m) if length_m > 0 else 0
             st.metric("1m単価", f"{price_per_m}円")
 
-         if st.button("スプレッドシートに保存"):
+        if st.button("スプレッドシートに保存"):
             try:
                 payload = {
                     "date": str(datetime.date.today()),
@@ -94,7 +92,6 @@ with tab1:
                     "unit_price": price_per_m,
                     "shop": shop
                 }
-                # GASのウェブアプリにデータを送信
                 response = requests.post(GAS_URL, data=json.dumps(payload))
                 
                 if response.status_code == 200:
@@ -107,3 +104,6 @@ with tab1:
                     st.write("Googleからのメッセージ:", response.text)
             except Exception as e:
                 st.error(f"エラーが発生しました: {e}")
+
+with tab2:
+    st.write("スプレッドシートを開いて在庫を確認してください。")
